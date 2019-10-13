@@ -1,0 +1,14 @@
+apiVersion: nginx.kubernetes.io/v1
+kind: NginxService
+metadata:
+  name: my-nginx
+spec:
+  size: 2
+  image: nginx:latest
+  env:
+    - name: MY_EVN
+      value: "hello world"
+  ports:
+    - port: 80
+      targetPort: 80
+
