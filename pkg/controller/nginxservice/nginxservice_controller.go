@@ -143,8 +143,10 @@ func (r *ReconcileNginxService) Reconcile(request reconcile.Request) (reconcile.
 	if err := json.Unmarshal([]byte(instance.Annotations["kubectl.kubernetes.io/last-applied-configuration"]), oldInstanceSpec); err != nil {
 		return reconcile.Result{}, nil
 	}
+	log.Info("oldInstanceSpec:", oldInstanceSpec)
 	// 与上次配置对比，如果不一致则更新
 	if !reflect.DeepEqual(instance.Spec, oldInstanceSpec) {
+		log.Info("exec update")
 		// 更新deploy资源
 		newDeploy := resources.NewDeploy(instance)
 		oldDeploy := &appsv1.Deployment{}
@@ -152,6 +154,8 @@ func (r *ReconcileNginxService) Reconcile(request reconcile.Request) (reconcile.
 			return reconcile.Result{}, err
 		}
 		oldDeploy.Spec = newDeploy.Spec
+		log.Info("更新deploy")
+		log.Info("deploy", oldDeploy)
 		if err := r.client.Update(context.TODO(), oldDeploy); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -163,6 +167,8 @@ func (r *ReconcileNginxService) Reconcile(request reconcile.Request) (reconcile.
 			return reconcile.Result{}, err
 		}
 		oldSvc.Spec = newSvc.Spec
+		log.Info("更新svc")
+		log.Info("svc", oldSvc)
 		if err := r.client.Update(context.TODO(), newSvc); err != nil {
 			return reconcile.Result{}, err
 		}
