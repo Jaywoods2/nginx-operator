@@ -16,7 +16,7 @@ spec:
       containers:
         - name: nginx-operator
           # Replace this with the built image name
-          image: registry.cn-shenzhen.aliyuncs.com/jaywoods/nginx-operator:v0.0.3
+          image: registry.cn-shenzhen.aliyuncs.com/jaywoods/nginx-operator:v0.0.4
           command:
           - nginx-operator
           imagePullPolicy: IfNotPresent
