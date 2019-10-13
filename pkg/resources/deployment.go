@@ -34,7 +34,7 @@ func NewDeploy(n *nginxv1.NginxService) *appsv1.Deployment {
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{},
+					Containers: newContainers(n),
 				},
 			},
 			Selector: selector,

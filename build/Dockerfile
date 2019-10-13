@@ -1,4 +1,5 @@
-FROM registry.access.redhat.com/ubi7/ubi-minimal:latest
+#FROM registry.access.redhat.com/ubi7/ubi-minimal:latest
+FROM registry.cn-shenzhen.aliyuncs.com/jaywoods/nginx-operator:base
 
 ENV OPERATOR=/usr/local/bin/nginx-operator \
     USER_UID=1001 \
