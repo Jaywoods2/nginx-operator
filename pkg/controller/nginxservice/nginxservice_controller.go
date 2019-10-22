@@ -3,7 +3,9 @@ package nginxservice
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"time"
 
 	nginxv1 "github.com/Jaywoods/nginx-operator/pkg/apis/nginx/v1"
 	"github.com/Jaywoods/nginx-operator/pkg/resources"
@@ -101,7 +103,6 @@ func (r *ReconcileNginxService) Reconcile(request reconcile.Request) (reconcile.
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-
 	if instance.DeletionTimestamp != nil {
 		return reconcile.Result{}, err
 	}
@@ -110,10 +111,10 @@ func (r *ReconcileNginxService) Reconcile(request reconcile.Request) (reconcile.
 	// 如果存在，判断是否需要更新
 	//   如果需要更新，则直接更新
 	//   如果不需要更新，则正常返回
-
 	deploy := &appsv1.Deployment{}
 	if err := r.client.Get(context.TODO(), request.NamespacedName, deploy); err != nil && errors.IsNotFound(err) {
 		// 创建关联资源
+		reqLogger.Info("开始创建资源")
 		// 1. 创建deploy
 		deploy := resources.NewDeploy(instance)
 		if err := r.client.Create(context.TODO(), deploy); err != nil {
@@ -129,34 +130,44 @@ func (r *ReconcileNginxService) Reconcile(request reconcile.Request) (reconcile.
 		// 关联Annotations 保留crd 上次配置，用次字段值与当前配置对比，来判断是否需要更新
 		data, _ := json.Marshal(instance.Spec)
 		if instance.Annotations != nil {
-			instance.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(data)
+			instance.Annotations["spec"] = string(data)
 		} else {
-			instance.Annotations = map[string]string{"kubectl.kubernetes.io/last-applied-configuration": string(data)}
+			instance.Annotations = map[string]string{"spec": string(data)}
 		}
 
 		if err := r.client.Update(context.TODO(), instance); err != nil {
-			return reconcile.Result{}, nil
+			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, err
 	}
-
-	oldInstanceSpec := nginxv1.NginxServiceSpec{}
-	if err := json.Unmarshal([]byte(instance.Annotations["kubectl.kubernetes.io/last-applied-configuration"]), oldInstanceSpec); err != nil {
-		return reconcile.Result{}, nil
+	oldInstanceSpec := &nginxv1.NginxServiceSpec{}
+	if err := json.Unmarshal([]byte(instance.Annotations["spec"]), oldInstanceSpec); err != nil {
+		reqLogger.Error(err, "json.Unmarshal报错")
+		return reconcile.Result{}, err
 	}
-	log.Info("oldInstanceSpec:", oldInstanceSpec)
 	// 与上次配置对比，如果不一致则更新
-	if !reflect.DeepEqual(instance.Spec, oldInstanceSpec) {
-		log.Info("exec update")
+	fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++")
+	fmt.Println("当前实例Spec:")
+	x, _ := json.Marshal(instance.Spec)
+	fmt.Println(string(x))
+	time.Sleep(1 * time.Second)
+	fmt.Println("老实例Spec")
+	x2, _ := json.Marshal(oldInstanceSpec)
+	fmt.Println(string(x2))
+	fmt.Println("比较结果：")
+	fmt.Println(reflect.DeepEqual(instance.Spec, *oldInstanceSpec))
+	fmt.Println("++++++++++++++++++++++++++++++++++++++++++++++++")
+	time.Sleep(2 * time.Second)
+	if !reflect.DeepEqual(instance.Spec, *oldInstanceSpec) {
+		reqLogger.Info("更新资源")
 		// 更新deploy资源
-		newDeploy := resources.NewDeploy(instance)
+		//newDeploy := resources.NewDeploy(instance)
 		oldDeploy := &appsv1.Deployment{}
 		if err := r.client.Get(context.TODO(), request.NamespacedName, oldDeploy); err != nil {
 			return reconcile.Result{}, err
 		}
-		oldDeploy.Spec = newDeploy.Spec
-		log.Info("更新deploy")
-		log.Info("deploy", oldDeploy)
+		resources.UpdateDeployFiled(instance, oldDeploy)
+		//oldDeploy.Spec = newDeploy.Spec
 		if err := r.client.Update(context.TODO(), oldDeploy); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -167,10 +178,15 @@ func (r *ReconcileNginxService) Reconcile(request reconcile.Request) (reconcile.
 		if err := r.client.Get(context.TODO(), request.NamespacedName, oldSvc); err != nil {
 			return reconcile.Result{}, err
 		}
+		newSvc.Spec.ClusterIP = oldSvc.Spec.ClusterIP
 		oldSvc.Spec = newSvc.Spec
-		log.Info("更新svc")
-		log.Info("svc", oldSvc)
-		if err := r.client.Update(context.TODO(), newSvc); err != nil {
+		if err := r.client.Update(context.TODO(), oldSvc); err != nil {
+			return reconcile.Result{}, err
+		}
+		// 将当前实例配置保存
+		cis, _ := json.Marshal(instance.Spec)
+		instance.Annotations = map[string]string{"spec": string(cis)}
+		if err := r.client.Update(context.TODO(), instance); err != nil {
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, err

@@ -62,3 +62,8 @@ func newContainers(n *nginxv1.NginxService) []corev1.Container {
 		},
 	}
 }
+
+func UpdateDeployFiled(n *nginxv1.NginxService, d *appsv1.Deployment) {
+	d.Spec.Replicas = n.Spec.Size
+	d.Spec.Template.Spec.Containers = newContainers(n)
+}
